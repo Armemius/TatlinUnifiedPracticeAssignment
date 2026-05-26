@@ -1,5 +1,8 @@
 #include "tape/tape.hpp"
 
+#include <chrono>
+#include <thread>
+
 namespace tp {
 
 Tape::Tape(Tape::LatencyConfig latency_config) : latency_config_(latency_config) {}
@@ -35,6 +38,12 @@ void Tape::prev() {
 void Tape::rewind() {
     account_rewind();
     do_rewind();
+}
+
+void Tape::delay(std::chrono::nanoseconds duration) const {
+    if (latency_config_.enable_sleep_delays) {
+        std::this_thread::sleep_for(duration);
+    }
 }
 
 void Tape::account_read() {
