@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 namespace tp {
 
@@ -95,6 +96,13 @@ class Tape {
 
     TapeStats stats_;
     LatencyConfig latency_config_;
+};
+
+class TapeFactory {
+   public:
+    virtual ~TapeFactory() = default;
+
+    virtual std::unique_ptr<Tape> create_temporary(size_t size) = 0;
 };
 
 }  // namespace tp
