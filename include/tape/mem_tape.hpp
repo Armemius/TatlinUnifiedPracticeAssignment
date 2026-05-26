@@ -17,13 +17,13 @@ class MemTape final : public Tape {
 
     MemTape(std::initializer_list<int32_t> list);
 
-    size_t size() const override;
+    [[nodiscard]] size_t size() const override;
 
-    size_t position() const override;
+    [[nodiscard]] size_t position() const override;
 
-    std::vector<int32_t>::const_iterator begin();
+    [[nodiscard]] std::vector<int32_t>::const_iterator begin() const;
 
-    std::vector<int32_t>::const_iterator end();
+    [[nodiscard]] std::vector<int32_t>::const_iterator end() const;
 
    protected:
     [[nodiscard]] int32_t do_read() override;
@@ -33,11 +33,11 @@ class MemTape final : public Tape {
     void do_rewind() override;
 
    private:
-    std::vector<int32_t> memory_;
+    std::vector<int32_t> cells_;
     std::vector<int32_t>::iterator cursor_;
 };
 
-class MemTapeFactory : public TapeFactory {
+class MemTapeFactory final : public TapeFactory {
    public:
     std::unique_ptr<Tape> create_temporary(size_t size) override;
 };

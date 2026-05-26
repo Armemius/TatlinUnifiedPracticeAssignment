@@ -9,15 +9,15 @@ namespace tp {
 
 class TapeSorter {
    public:
-    TapeSorter(std::shared_ptr<TapeFactory> temporary_factory, size_t mem_limit);
+    TapeSorter(std::shared_ptr<TapeFactory> temporary_tape_factory, size_t memory_limit_bytes);
 
-    virtual void sort(std::shared_ptr<Tape> input, std::shared_ptr<Tape> output) = 0;
+    virtual void sort(std::shared_ptr<Tape> input_tape, std::shared_ptr<Tape> output_tape) = 0;
 
     virtual ~TapeSorter() = default;
 
    protected:
-    size_t mem_limit_{};
-    std::shared_ptr<TapeFactory> temporary_factory_;
+    size_t memory_limit_bytes_{};
+    std::shared_ptr<TapeFactory> temporary_tape_factory_;
 };
 
-};  // namespace tp
+}  // namespace tp

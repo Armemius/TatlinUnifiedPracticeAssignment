@@ -2,7 +2,7 @@
 
 namespace tp {
 
-TapeSorter::TapeSorter(std::shared_ptr<TapeFactory> temporary_factory, size_t mem_limit)
-    : temporary_factory_(std::move(temporary_factory)), mem_limit_(mem_limit) {}
+TapeSorter::TapeSorter(std::shared_ptr<TapeFactory> temporary_tape_factory, size_t memory_limit_bytes)
+    : memory_limit_bytes_(memory_limit_bytes), temporary_tape_factory_(std::move(temporary_tape_factory)) {}
 
 }  // namespace tp

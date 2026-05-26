@@ -1,83 +1,116 @@
 #include "tape/external_merge_tape_sorter.hpp"
+
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace tp {
 
-ExternalMergeTapeSorter::ExternalMergeTapeSorter(std::shared_ptr<TapeFactory> temporary_factory, size_t mem_limit)
-    : TapeSorter(std::move(temporary_factory), mem_limit) {}
+namespace {
 
-void ExternalMergeTapeSorter::sort(std::shared_ptr<Tape> input, std::shared_ptr<Tape> output) {
-    clear();
-    input->rewind();
-    output->rewind();
+[[nodiscard]] bool has_unread_values(const Tape &tape) {
+    return tape.position() < tape.size();
+}
 
-    const size_t values_limit = mem_limit_ / sizeof(int32_t);
-    if (values_limit == 0 && input->size() != 0) {
+}  // namespace
+
+ExternalMergeTapeSorter::ExternalMergeTapeSorter(std::shared_ptr<TapeFactory> temporary_tape_factory,
+                                                 size_t memory_limit_bytes)
+    : TapeSorter(std::move(temporary_tape_factory), memory_limit_bytes) {}
+
+void ExternalMergeTapeSorter::sort(std::shared_ptr<Tape> input_tape, std::shared_ptr<Tape> output_tape) {
+    input_tape->rewind();
+    output_tape->rewind();
+
+    const size_t max_chunk_size = max_chunk_value_count(*input_tape);
+    SortedRun sorted_run = create_empty_run(input_tape->size());
+    SortedRun merge_target = create_empty_run(input_tape->size());
+
+    while (has_unread_values(*input_tape)) {
+        const std::vector<int32_t> sorted_chunk = read_sorted_chunk(*input_tape, max_chunk_size);
+        merge_run_with_chunk(*sorted_run.tape, sorted_run.value_count, sorted_chunk, *merge_target.tape);
+        merge_target.value_count = sorted_run.value_count + sorted_chunk.size();
+        std::ranges::swap(sorted_run, merge_target);
+    }
+
+    copy_run(*sorted_run.tape, sorted_run.value_count, *output_tape);
+}
+
+size_t ExternalMergeTapeSorter::max_chunk_value_count(const Tape &input_tape) const {
+    const size_t max_value_count = memory_limit_bytes_ / sizeof(int32_t);
+    if (max_value_count == 0 && input_tape.size() != 0) {
         throw std::invalid_argument("memory limit is too small to hold one tape element");
     }
+    return max_value_count;
+}
 
-    std::pair<TemporaryBuffer, TemporaryBuffer> buffers{
-        TemporaryBuffer{.tape = temporary_factory_->create_temporary(input->size()), .elements = 0},
-        TemporaryBuffer{.tape = temporary_factory_->create_temporary(input->size()), .elements = 0},
-    };
+ExternalMergeTapeSorter::SortedRun ExternalMergeTapeSorter::create_empty_run(size_t tape_size) const {
+    return {.tape = temporary_tape_factory_->create_temporary(tape_size), .value_count = 0};
+}
 
-    while (input->position() < input->size()) {
-        while (buffer_.size() < values_limit && input->position() < input->size()) {
-            buffer_.push_back(input->read());
-            input->next();
-        }
-        std::ranges::sort(buffer_);
-        merge_tape_with_buffer(buffers.first.tape.get(), buffers.first.elements, buffers.second.tape.get());
-        buffers.second.elements = buffers.first.elements + buffer_.size();
-        std::ranges::swap(buffers.first, buffers.second);
-        buffer_.clear();
+std::vector<int32_t> ExternalMergeTapeSorter::read_sorted_chunk(Tape &input_tape, size_t max_value_count) {
+    std::vector<int32_t> chunk;
+    chunk.reserve(max_value_count);
+
+    while (chunk.size() < max_value_count && has_unread_values(input_tape)) {
+        chunk.push_back(input_tape.read());
+        input_tape.next();
     }
 
-    merge_tape_with_buffer(buffers.first.tape.get(), buffers.first.elements, output.get());
-    clear();
+    std::ranges::sort(chunk);
+    return chunk;
 }
 
-void ExternalMergeTapeSorter::clear() {
-    buffer_.clear();
-}
+void ExternalMergeTapeSorter::merge_run_with_chunk(Tape &run_tape, size_t run_value_count,
+                                                   std::span<const int32_t> sorted_chunk, Tape &output_tape) {
+    run_tape.rewind();
+    output_tape.rewind();
 
-void ExternalMergeTapeSorter::merge_tape_with_buffer(Tape *input, size_t size, Tape *output) {
-    input->rewind();
-    output->rewind();
-    size_t input_tape_pos{};
-    size_t buffer_pos{};
+    size_t copied_from_run{};
+    size_t copied_from_chunk{};
 
-    while (input_tape_pos < size && buffer_pos < buffer_.size()) {
-        int32_t tape_value = input->read();
-        int32_t buffer_value = buffer_[buffer_pos];
-        int32_t output_value{};
+    while (copied_from_run < run_value_count && copied_from_chunk < sorted_chunk.size()) {
+        const int32_t run_value = run_tape.read();
+        const int32_t chunk_value = sorted_chunk[copied_from_chunk];
 
-        if (tape_value < buffer_value) {
-            output_value = tape_value;
-            ++input_tape_pos;
-            input->next();
+        if (run_value < chunk_value) {
+            output_tape.write(run_value);
+            ++copied_from_run;
+            run_tape.next();
         } else {
-            output_value = buffer_value;
-            ++buffer_pos;
+            output_tape.write(chunk_value);
+            ++copied_from_chunk;
         }
 
-        output->write(output_value);
-        output->next();
+        output_tape.next();
     }
-    while (input_tape_pos < size) {
-        output->write(input->read());
-        ++input_tape_pos;
-        input->next();
-        output->next();
+
+    while (copied_from_run < run_value_count) {
+        output_tape.write(run_tape.read());
+        ++copied_from_run;
+        run_tape.next();
+        output_tape.next();
     }
-    while (buffer_pos < buffer_.size()) {
-        output->write(buffer_[buffer_pos]);
-        ++buffer_pos;
-        output->next();
+
+    while (copied_from_chunk < sorted_chunk.size()) {
+        output_tape.write(sorted_chunk[copied_from_chunk]);
+        ++copied_from_chunk;
+        output_tape.next();
+    }
+}
+
+void ExternalMergeTapeSorter::copy_run(Tape &source_tape, size_t value_count, Tape &output_tape) {
+    source_tape.rewind();
+    output_tape.rewind();
+
+    for (size_t copied_values = 0; copied_values < value_count; ++copied_values) {
+        output_tape.write(source_tape.read());
+        source_tape.next();
+        output_tape.next();
     }
 }
 

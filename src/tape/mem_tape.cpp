@@ -6,16 +6,16 @@ namespace tp {
 
 MemTape::MemTape(size_t size) : MemTape(size, {}) {}
 
-MemTape::MemTape(size_t size, LatencyConfig config) : memory_(size), cursor_(memory_.begin()), Tape(config) {}
+MemTape::MemTape(size_t size, LatencyConfig config) : Tape(config), cells_(size), cursor_(cells_.begin()) {}
 
-MemTape::MemTape(std::initializer_list<int32_t> list) : memory_(list.begin(), list.end()), cursor_(memory_.begin()) {}
+MemTape::MemTape(std::initializer_list<int32_t> list) : cells_(list.begin(), list.end()), cursor_(cells_.begin()) {}
 
 size_t MemTape::size() const {
-    return memory_.size();
+    return cells_.size();
 }
 
 size_t MemTape::position() const {
-    return std::ranges::distance(memory_.begin(), cursor_);
+    return std::ranges::distance(cells_.begin(), cursor_);
 }
 
 int32_t MemTape::do_read() {
@@ -27,27 +27,27 @@ void MemTape::do_write(int32_t value) {
 }
 
 void MemTape::do_next() {
-    if (cursor_ != memory_.end()) {
+    if (cursor_ != cells_.end()) {
         ++cursor_;
     }
 }
 
 void MemTape::do_prev() {
-    if (cursor_ != memory_.begin()) {
+    if (cursor_ != cells_.begin()) {
         --cursor_;
     }
 }
 
 void MemTape::do_rewind() {
-    cursor_ = memory_.begin();
+    cursor_ = cells_.begin();
 }
 
-std::vector<int32_t>::const_iterator MemTape::begin() {
-    return memory_.cbegin();
+std::vector<int32_t>::const_iterator MemTape::begin() const {
+    return cells_.cbegin();
 }
 
-std::vector<int32_t>::const_iterator MemTape::end() {
-    return memory_.cend();
+std::vector<int32_t>::const_iterator MemTape::end() const {
+    return cells_.cend();
 }
 
 std::unique_ptr<Tape> MemTapeFactory::create_temporary(size_t size) {
