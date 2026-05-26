@@ -4,6 +4,7 @@
 #include "tape/mem_tape.hpp"
 
 #include <chrono>
+#include <memory>
 #include <ranges>
 
 namespace tp {
@@ -149,6 +150,12 @@ TEST(MemTapeTests, ExposesInternalStructureViaIterators) {
     std::vector<int32_t> src{1, 2, 3, 4, 5, 6, 7};
     MemTape tape{1, 2, 3, 4, 5, 6, 7};
     ASSERT_TRUE(std::ranges::equal(src, tape));
+}
+
+TEST(MemTapeTests, FactoryProducesTemporaryTapes) {
+    MemTapeFactory factory;
+    std::unique_ptr<Tape> tape = factory.create_temporary(42);
+    ASSERT_EQ(tape->size(), 42);
 }
 
 }  // namespace
