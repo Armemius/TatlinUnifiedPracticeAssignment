@@ -145,5 +145,11 @@ TEST(MemTapeTests, ShowsActualPosition) {
     ASSERT_EQ(tape.position(), 6);
 }
 
+TEST(MemTapeTests, ExposesInternalStructureViaIterators) {
+    std::vector<int32_t> src{1, 2, 3, 4, 5, 6, 7};
+    MemTape tape{1, 2, 3, 4, 5, 6, 7};
+    ASSERT_TRUE(std::ranges::equal(src, tape));
+}
+
 }  // namespace
 }  // namespace tp
