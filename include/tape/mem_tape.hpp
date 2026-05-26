@@ -37,4 +37,9 @@ class MemTape final : public Tape {
     std::vector<int32_t>::iterator cursor_;
 };
 
+class MemTapeFactory : public TapeFactory {
+   public:
+    std::unique_ptr<Tape> create_temporary(size_t size) override;
+};
+
 }  // namespace tp

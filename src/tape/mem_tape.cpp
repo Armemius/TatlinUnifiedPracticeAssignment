@@ -1,4 +1,5 @@
 #include "tape/mem_tape.hpp"
+#include <memory>
 #include "tape/tape.hpp"
 
 namespace tp {
@@ -47,6 +48,10 @@ std::vector<int32_t>::const_iterator MemTape::begin() {
 
 std::vector<int32_t>::const_iterator MemTape::end() {
     return memory_.cend();
+}
+
+std::unique_ptr<Tape> MemTapeFactory::create_temporary(size_t size) {
+    return std::make_unique<MemTape>(size);
 }
 
 }  // namespace tp
