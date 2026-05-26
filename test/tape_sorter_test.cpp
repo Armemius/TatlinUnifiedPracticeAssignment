@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
 
+#include "tape/external_k_way_merge_tape_sorter.hpp"
 #include "tape/external_merge_tape_sorter.hpp"
 #include "tape/mem_tape.hpp"
 #include "tape/tape.hpp"
 
 #include <algorithm>
 #include <cstdint>
-#include <initializer_list>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -14,56 +14,109 @@
 namespace tp {
 namespace {
 
-TEST(TapeSorterTests, SortsWhenBufferIsLargerThanInputTape) {
+std::shared_ptr<MemTape> make_tape(const std::vector<int32_t> &values) {
+    std::shared_ptr<MemTape> tape = std::make_shared<MemTape>(values.size());
+
+    for (const int32_t value : values) {
+        tape->write(value);
+        tape->next();
+    }
+    tape->rewind();
+
+    return tape;
+}
+
+std::vector<std::vector<int32_t>> sorting_inputs() {
+    return {
+        {},
+        {42},
+        {-5, -1, 0, 7, 12},
+        {12, 7, 0, -1, -5},
+        {5, -1, 5, 0, -7, 3, 3, -1},
+        {34, -12, 0, 99, 17, -100, 42, 42, 8, 3, 3, 11, -5, 76, 21, 1, 0, -33, 18, 18, 7},
+    };
+}
+
+void assert_sorts_values(TapeSorter &sorter, const std::vector<int32_t> &input_values) {
+    std::shared_ptr<Tape> input_tape = make_tape(input_values);
+    std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());
+
+    sorter.sort(input_tape, output_tape);
+
+    std::vector<int32_t> expected(input_values.begin(), input_values.end());
+    std::ranges::sort(expected);
+    std::vector result(output_tape->begin(), output_tape->end());
+    ASSERT_EQ(result, expected);
+}
+
+template <class SorterFactory>
+void assert_sorter_handles_common_inputs(SorterFactory create_sorter) {
+    for (const std::vector<int32_t> &input_values : sorting_inputs()) {
+        std::unique_ptr<TapeSorter> sorter = create_sorter();
+        assert_sorts_values(*sorter, input_values);
+    }
+}
+
+TEST(ExternalMergeSorterTests, SortsCommonInputsWhenBufferIsLargerThanInputTape) {
     std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
     ExternalMergeTapeSorter sorter{std::move(factory), 4096};
 
-    auto input_range = {9, 4, 3, 7, 6, 1, 2, 5, 8};
-    std::shared_ptr<Tape> input_tape = std::make_shared<MemTape>(input_range);
-    std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());
-    sorter.sort(input_tape, output_tape);
-
-    std::vector expected(input_range.begin(), input_range.end());
-    std::ranges::sort(expected);
-    std::vector result(output_tape->begin(), output_tape->end());
-    ASSERT_EQ(result, expected);
+    assert_sorts_values(sorter, {9, 4, 3, 7, 6, 1, 2, 5, 8});
 }
 
-TEST(TapeSorterTests, SortsWhenBufferIsSmallerThanInputTape) {
-    std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
-    ExternalMergeTapeSorter sorter{std::move(factory), sizeof(int32_t) * 4};
-
-    auto input_range = {9, 4, 3, 7, 6, 1, 2, 5, 8};
-    std::shared_ptr<Tape> input_tape = std::make_shared<MemTape>(input_range);
-    std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());
-    sorter.sort(input_tape, output_tape);
-
-    std::vector expected(input_range.begin(), input_range.end());
-    std::ranges::sort(expected);
-    std::vector result(output_tape->begin(), output_tape->end());
-    ASSERT_EQ(result, expected);
+TEST(ExternalMergeSorterTests, SortsCommonInputsWithMultiChunkRuns) {
+    assert_sorter_handles_common_inputs([] {
+        return std::make_unique<ExternalMergeTapeSorter>(std::make_shared<MemTapeFactory>(), sizeof(int32_t) * 3);
+    });
 }
 
-TEST(TapeSorterTests, SortsOneElementChunksWithRepeatedAndNegativeValues) {
-    std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
-    ExternalMergeTapeSorter sorter{std::move(factory), sizeof(int32_t)};
-
-    auto input_range = {5, -1, 5, 0, -7, 3, 3, -1};
-    std::shared_ptr<Tape> input_tape = std::make_shared<MemTape>(input_range);
-    std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());
-    sorter.sort(input_tape, output_tape);
-
-    std::vector expected(input_range.begin(), input_range.end());
-    std::ranges::sort(expected);
-    std::vector result(output_tape->begin(), output_tape->end());
-    ASSERT_EQ(result, expected);
+TEST(ExternalMergeSorterTests, SortsCommonInputsWithOneValueChunks) {
+    assert_sorter_handles_common_inputs(
+        [] { return std::make_unique<ExternalMergeTapeSorter>(std::make_shared<MemTapeFactory>(), sizeof(int32_t)); });
 }
 
-TEST(TapeSorterTests, RejectsMemoryLimitBelowOneElement) {
+TEST(ExternalMergeSorterTests, RejectsMemoryLimitBelowOneElement) {
     std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
     ExternalMergeTapeSorter sorter{std::move(factory), sizeof(int32_t) - 1};
 
-    std::shared_ptr<Tape> input_tape = std::make_shared<MemTape>(std::initializer_list<int32_t>{1});
+    std::shared_ptr<Tape> input_tape = make_tape({1});
+    std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());
+
+    ASSERT_THROW(sorter.sort(input_tape, output_tape), std::invalid_argument);
+}
+
+TEST(ExternalKWayMergeSorterTests, SortsCommonInputsWithBinaryHeapMerge) {
+    assert_sorter_handles_common_inputs([] {
+        return std::make_unique<ExternalKWayMergeTapeSorter>(std::make_shared<MemTapeFactory>(), sizeof(int32_t) * 2,
+                                                             2);
+    });
+}
+
+TEST(ExternalKWayMergeSorterTests, SortsCommonInputsWithTernaryHeapMerge) {
+    assert_sorter_handles_common_inputs([] {
+        return std::make_unique<ExternalKWayMergeTapeSorter>(std::make_shared<MemTapeFactory>(), sizeof(int32_t) * 3,
+                                                             3);
+    });
+}
+
+TEST(ExternalKWayMergeSorterTests, SortsWhenFinalMergeGroupIsNotFull) {
+    std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
+    ExternalKWayMergeTapeSorter sorter{std::move(factory), sizeof(int32_t), 4};
+
+    assert_sorts_values(sorter, {8, 2, 5, 1, 7, 3, 6, 4, 0});
+}
+
+TEST(ExternalKWayMergeSorterTests, RejectsMergeOrderBelowTwo) {
+    std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
+
+    ASSERT_THROW(ExternalKWayMergeTapeSorter sorter(std::move(factory), sizeof(int32_t), 1), std::invalid_argument);
+}
+
+TEST(ExternalKWayMergeSorterTests, RejectsMemoryLimitBelowOneElement) {
+    std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
+    ExternalKWayMergeTapeSorter sorter{std::move(factory), sizeof(int32_t) - 1, 3};
+
+    std::shared_ptr<Tape> input_tape = make_tape({1});
     std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());
 
     ASSERT_THROW(sorter.sort(input_tape, output_tape), std::invalid_argument);
