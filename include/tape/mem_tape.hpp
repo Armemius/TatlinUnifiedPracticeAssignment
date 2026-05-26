@@ -21,6 +21,10 @@ class MemTape final : public Tape {
 
     size_t position() const override;
 
+    std::vector<int32_t>::const_iterator begin();
+
+    std::vector<int32_t>::const_iterator end();
+
    protected:
     [[nodiscard]] int32_t do_read() override;
     void do_write(int32_t value) override;

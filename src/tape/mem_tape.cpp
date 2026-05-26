@@ -41,4 +41,12 @@ void MemTape::do_rewind() {
     cursor_ = memory_.begin();
 }
 
+std::vector<int32_t>::const_iterator MemTape::begin() {
+    return memory_.cbegin();
+}
+
+std::vector<int32_t>::const_iterator MemTape::end() {
+    return memory_.cend();
+}
+
 }  // namespace tp
