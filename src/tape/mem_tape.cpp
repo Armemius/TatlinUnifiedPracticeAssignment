@@ -14,7 +14,7 @@ size_t MemTape::size() const {
 }
 
 size_t MemTape::position() const {
-    return cursor_ - memory_.cbegin();
+    return std::ranges::distance(memory_.begin(), cursor_);
 }
 
 int32_t MemTape::do_read() {
@@ -32,7 +32,7 @@ void MemTape::do_next() {
 }
 
 void MemTape::do_prev() {
-    if (cursor_ != memory_.end()) {
+    if (cursor_ != memory_.begin()) {
         --cursor_;
     }
 }
