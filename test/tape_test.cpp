@@ -150,7 +150,9 @@ TEST(MemTapeTests, ShowsActualPosition) {
 TEST(MemTapeTests, ExposesInternalStructureViaIterators) {
     std::vector<int32_t> src{1, 2, 3, 4, 5, 6, 7};
     MemTape tape{1, 2, 3, 4, 5, 6, 7};
-    ASSERT_TRUE(std::ranges::equal(src, tape));
+
+    std::vector result(tape.begin(), tape.end());
+    ASSERT_EQ(src, result);
 }
 
 TEST(MemTapeTests, FactoryProducesTemporaryTapes) {
