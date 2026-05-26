@@ -1,0 +1,172 @@
+---
+name: CI
+
+"on":
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: .
+
+jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-19
+
+      - name: Check formatting
+        run: |
+          find app include src test \
+            -type f \( \
+              -name '*.c' -o \
+              -name '*.cc' -o \
+              -name '*.cpp' -o \
+              -name '*.cxx' -o \
+              -name '*.h' -o \
+              -name '*.hpp' -o \
+              -name '*.hxx' \
+            \) \
+            -print0 | xargs -0 clang-format-19 --dry-run --Werror
+
+  build-test:
+    name: build and test
+    runs-on: ubuntu-24.04
+
+    env:
+      CC: gcc
+      CXX: g++
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure
+        run: cmake --preset ci-debug
+
+      - name: Build
+        run: cmake --build --preset build-ci-debug --parallel
+
+      - name: Test
+        run: ctest --preset test-ci-debug
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-linux
+          path: .build/ci-debug/app/task
+          if-no-files-found: error
+
+  msvc-build-test:
+    name: msvc build and test
+    runs-on: windows-2022
+
+    env:
+      CC: cl
+      CXX: cl
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        run: cmake --preset ci-debug
+
+      - name: Build
+        run: cmake --build --preset build-ci-debug --parallel
+
+      - name: Test
+        run: ctest --preset test-ci-debug
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-windows
+          path: .build/ci-debug/app/task*.exe
+          if-no-files-found: error
+
+  static-analysis:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang clang-tidy
+
+      - name: Configure
+        run: cmake --preset ci-debug
+
+      - name: Analyze
+        run: |
+          mapfile -d '' sources < <(
+            find app src test \
+              -type f \( \
+                -name '*.cc' -o \
+                -name '*.cpp' -o \
+                -name '*.cxx' \
+              \) \
+              -print0
+          )
+
+          clang-tidy \
+            -p .build/ci-debug \
+            --header-filter='^'"$PWD"'/(app|include|src|test)/' \
+            "${sources[@]}"
+
+  sanitizers:
+    name: ASan/UBSan
+    runs-on: ubuntu-24.04
+
+    env:
+      ASAN_OPTIONS: >-
+        detect_leaks=1:strict_string_checks=1:check_initialization_order=1
+      UBSAN_OPTIONS: print_stacktrace=1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure
+        run: cmake --preset ci-sanitizers
+
+      - name: Build
+        run: cmake --build --preset build-ci-sanitizers --parallel
+
+      - name: Test
+        run: ctest --preset test-ci-sanitizers

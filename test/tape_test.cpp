@@ -4,7 +4,9 @@
 #include "tape/tape.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace tp {
 namespace {
