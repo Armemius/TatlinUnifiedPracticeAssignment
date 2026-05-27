@@ -6,6 +6,11 @@ import random
 import struct
 from pathlib import Path
 
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
+
 INT32_MIN = -(2**31)
 INT32_MAX = 2**31 - 1
 VALUES_PER_CHUNK = 8192
@@ -43,12 +48,19 @@ def write_random_tape(path: Path, size: int, min_value: int, max_value: int, see
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with path.open("wb") as stream:
-        values_left = size
-        while values_left > 0:
-            chunk_size = min(values_left, VALUES_PER_CHUNK)
-            chunk = (rng.randint(min_value, max_value) for _ in range(chunk_size))
-            stream.write(struct.pack(f"<{chunk_size}i", *chunk))
-            values_left -= chunk_size
+        progress = None if tqdm is None else tqdm(total=size, unit="cell", unit_scale=True, desc="Writing tape")
+        try:
+            values_left = size
+            while values_left > 0:
+                chunk_size = min(values_left, VALUES_PER_CHUNK)
+                chunk = (rng.randint(min_value, max_value) for _ in range(chunk_size))
+                stream.write(struct.pack(f"<{chunk_size}i", *chunk))
+                values_left -= chunk_size
+                if progress is not None:
+                    progress.update(chunk_size)
+        finally:
+            if progress is not None:
+                progress.close()
 
 
 def main() -> int:
