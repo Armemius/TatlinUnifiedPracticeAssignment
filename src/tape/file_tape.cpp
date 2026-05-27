@@ -80,6 +80,14 @@ FileTape::FileTape(const std::filesystem::path &path, size_t size, LatencyConfig
     }
     size_ = bytes / sizeof(int32_t);
     pos_ = 0;
+    if (size_ < size) {
+        stream_.seekg(0, std::ios::end);
+        while (size_ < size) {
+            int32_t value = 0;
+            stream_.write(reinterpret_cast<const char *>(&value), sizeof(int32_t));
+            ++size_;
+        }
+    }
     stream_.seekg(0, std::ios::beg);
 }
 
