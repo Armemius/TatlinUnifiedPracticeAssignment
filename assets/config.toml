@@ -1,0 +1,17 @@
+[tape_sorter]
+memory_limit = "256mb"
+
+# Available
+# - basic_external_merge
+# - k_way_external_merge
+algorithm = "basic_external_merge"
+
+[tape_sorter.latency]
+emulate_delays = false
+read = "1us"
+write = "2us"
+move = "100us"
+rewind = "1ms"
+
+[tape_sorter.k_way_external_merge]
+merge_order = 16
