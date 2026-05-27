@@ -11,7 +11,7 @@ include(GoogleTest)
 
 
 add_executable(tape-test tape_test.cpp tape_sorter_test.cpp)
-target_link_libraries(tape-test PRIVATE tape-emulator GTest::gtest_main)
+target_link_libraries(tape-test PRIVATE tape-emulator utils GTest::gtest_main)
 target_compile_features(tape-test PRIVATE cxx_std_20)
 
 gtest_discover_tests(tape-test)
