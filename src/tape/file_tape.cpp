@@ -8,6 +8,7 @@
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace {
 
@@ -24,6 +25,41 @@ int32_t to_little_endian(int32_t value) {
 int32_t from_little_endian(int32_t value) {
     return to_little_endian(value);
 }
+
+void add_stats(tp::Tape::TapeStats &target, const tp::Tape::TapeStats &source) {
+    target.reads += source.reads;
+    target.writes += source.writes;
+    target.moves += source.moves;
+    target.rewinds += source.rewinds;
+    target.simulated_time += source.simulated_time;
+}
+
+class TrackedTemporaryTape final : public tp::Tape {
+   public:
+    TrackedTemporaryTape(std::unique_ptr<tp::Tape> tape, LatencyConfig latency_config, TapeStats &stats_sink)
+        : Tape(latency_config), tape_(std::move(tape)), stats_sink_(stats_sink) {}
+
+    ~TrackedTemporaryTape() override { add_stats(stats_sink_, stats()); }
+
+    [[nodiscard]] size_t size() const override { return tape_->size(); }
+
+    [[nodiscard]] size_t position() const override { return tape_->position(); }
+
+   protected:
+    [[nodiscard]] int32_t do_read() override { return tape_->read(); }
+
+    void do_write(int32_t value) override { tape_->write(value); }
+
+    void do_next() override { tape_->next(); }
+
+    void do_prev() override { tape_->prev(); }
+
+    void do_rewind() override { tape_->rewind(); }
+
+   private:
+    std::unique_ptr<tp::Tape> tape_;
+    TapeStats &stats_sink_;
+};
 
 }  // namespace
 
@@ -161,15 +197,28 @@ void FileTape::sync_put() {
     }
 }
 
-FileTapeFactory::FileTapeFactory(std::filesystem::path path) : temporary_path_(std::move(path)) {
+FileTapeFactory::FileTapeFactory(std::filesystem::path path) : FileTapeFactory(std::move(path), {}) {}
+
+FileTapeFactory::FileTapeFactory(std::filesystem::path path, Tape::LatencyConfig config)
+    : temporary_path_(std::move(path)), latency_config_(config) {
     std::filesystem::create_directories(temporary_path_);
 }
 
 std::unique_ptr<Tape> FileTapeFactory::create_temporary(size_t size) {
     std::ostringstream tape_name;
-    tape_name << "tmp_tape_" << created_tapes_++ << ".bin";  // No std::format in my WSL stdc++ :(
+    tape_name << "tmp_tape_" << next_tape_id_++ << ".bin";  // No std::format in my WSL stdc++ :(
     std::filesystem::path tmp_tape_path = temporary_path_ / tape_name.str();
-    return std::make_unique<FileTape>(tmp_tape_path, size);
+    ++created_tape_count_;
+    return std::make_unique<TrackedTemporaryTape>(std::make_unique<FileTape>(tmp_tape_path, size), latency_config_,
+                                                  temporary_stats_);
+}
+
+size_t FileTapeFactory::created_tape_count() const noexcept {
+    return created_tape_count_;
+}
+
+const Tape::TapeStats &FileTapeFactory::temporary_stats() const noexcept {
+    return temporary_stats_;
 }
 
 }  // namespace tp

@@ -52,12 +52,21 @@ class FileTapeFactory : public TapeFactory {
    public:
     explicit FileTapeFactory(std::filesystem::path path);
 
+    FileTapeFactory(std::filesystem::path path, Tape::LatencyConfig config);
+
     std::unique_ptr<Tape> create_temporary(size_t size) override;
 
+    [[nodiscard]] size_t created_tape_count() const noexcept;
+
+    [[nodiscard]] const Tape::TapeStats &temporary_stats() const noexcept;
+
    private:
-    inline static size_t created_tapes_ = 0;
+    inline static size_t next_tape_id_ = 0;
 
     std::filesystem::path temporary_path_;
+    Tape::LatencyConfig latency_config_;
+    size_t created_tape_count_{};
+    Tape::TapeStats temporary_stats_;
 };
 
 }  // namespace tp
