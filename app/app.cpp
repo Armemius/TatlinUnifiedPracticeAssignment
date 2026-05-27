@@ -1,12 +1,16 @@
+#include "config/parser.hpp"
+#include "tape/external_k_way_merge_tape_sorter.hpp"
+#include "tape/external_merge_tape_sorter.hpp"
+#include "tape/file_tape.hpp"
+#include "tape/tape_sorter.hpp"
+#include "utils/tmp_directory.hpp"
+
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <iostream>
 #include <memory>
 #include <optional>
-#include "tape/external_merge_tape_sorter.hpp"
-#include "tape/file_tape.hpp"
-#include "utils/tmp_directory.hpp"
 
 int main(int argc, char **argv) {
     if (argc != 3 && argc != 4) {
@@ -23,13 +27,31 @@ int main(int argc, char **argv) {
     }
 
     try {
+        tp::config::Config config;
+        if (config_path.has_value()) {
+            config = tp::config::parse_config(*config_path);
+        }
+
         auto temp_dir = tp::utils::TmpDirectory();
-        auto input_tape = std::make_shared<tp::FileTape>(input_tape_path);
-        auto output_tape = std::make_shared<tp::FileTape>(output_tape_path, input_tape->size());
+        auto input_tape = std::make_shared<tp::FileTape>(input_tape_path, config.tape_sorter.latency);
+        auto output_tape =
+            std::make_shared<tp::FileTape>(output_tape_path, input_tape->size(), config.tape_sorter.latency);
         auto tape_factory = std::make_shared<tp::FileTapeFactory>(temp_dir.path());
 
-        auto sorter = tp::ExternalMergeTapeSorter(tape_factory, 1024 * 1024 * 256);
-        sorter.sort(input_tape, output_tape);
+        std::unique_ptr<tp::TapeSorter> sorter;
+        switch (config.tape_sorter.algorithm) {
+            case tp::config::TapeSorterAlgorithm::BASIC_EXTERNAL_MERGE:
+                sorter =
+                    std::make_unique<tp::ExternalMergeTapeSorter>(tape_factory, config.tape_sorter.memory_limit_bytes);
+                break;
+            case tp::config::TapeSorterAlgorithm::K_WAY_EXTERNAL_MERGE:
+                sorter = std::make_unique<tp::ExternalKWayMergeTapeSorter>(
+                    tape_factory, config.tape_sorter.memory_limit_bytes,
+                    config.tape_sorter.k_way_external_merge.merge_order);
+                break;
+        }
+
+        sorter->sort(input_tape, output_tape);
     } catch (const std::exception &ex) {
         std::cerr << "Error while processing: " << ex.what() << "\n";
         return EXIT_FAILURE;
