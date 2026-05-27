@@ -1,9 +1,18 @@
 # Tape emulation library
 
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG v1.15.3
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(spdlog)
+
 file(GLOB TAPE_EMULATOR_SOURCES_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/tape/*.cpp")
 file(GLOB TAPE_EMULATOR_HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/tape/*.hpp")
 add_library(tape-emulator ${TAPE_EMULATOR_SOURCES_LIST} ${TAPE_EMULATOR_HEADER_LIST})
 target_include_directories(tape-emulator PUBLIC "${PROJECT_SOURCE_DIR}/include")
+target_link_libraries(tape-emulator PRIVATE spdlog::spdlog)
 target_compile_features(tape-emulator PUBLIC cxx_std_20)
 
 source_group(
@@ -41,8 +50,8 @@ source_group(
 FetchContent_Declare(
     tomlplusplus
     GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
-    GIT_TAG        v3.4.0
-    GIT_SHALLOW    TRUE
+    GIT_TAG v3.4.0
+    GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(tomlplusplus)
 

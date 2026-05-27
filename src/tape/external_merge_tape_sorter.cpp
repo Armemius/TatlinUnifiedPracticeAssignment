@@ -1,5 +1,9 @@
 #include "tape/external_merge_tape_sorter.hpp"
 
+#include "sort_progress_logger.hpp"
+
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -27,17 +31,31 @@ void ExternalMergeTapeSorter::sort(std::shared_ptr<Tape> input_tape, std::shared
     output_tape->rewind();
 
     const size_t max_chunk_size = max_chunk_value_count(*input_tape);
+    spdlog::info("external merge sort started: input_size={}, memory_limit_bytes={}, max_chunk_size={}",
+                 input_tape->size(), memory_limit_bytes_, max_chunk_size);
+
     SortedRun sorted_run = create_empty_run(input_tape->size());
     SortedRun merge_target = create_empty_run(input_tape->size());
 
+    size_t chunk_index = 0;
     while (has_unread_values(*input_tape)) {
+        const size_t chunk_start_position = input_tape->position();
         const std::vector<int32_t> sorted_chunk = read_sorted_chunk(*input_tape, max_chunk_size);
+        spdlog::info("external merge sort chunk read: chunk={}, start_position={}, value_count={}", chunk_index,
+                     chunk_start_position, sorted_chunk.size());
+
         merge_run_with_chunk(*sorted_run.tape, sorted_run.value_count, sorted_chunk, *merge_target.tape);
         merge_target.value_count = sorted_run.value_count + sorted_chunk.size();
+        spdlog::info(
+            "external merge sort run merged: chunk={}, previous_run_size={}, chunk_size={}, merged_run_size={}",
+            chunk_index, sorted_run.value_count, sorted_chunk.size(), merge_target.value_count);
+
         std::ranges::swap(sorted_run, merge_target);
+        ++chunk_index;
     }
 
     copy_run(*sorted_run.tape, sorted_run.value_count, *output_tape);
+    spdlog::info("external merge sort finished: chunks={}, output_size={}", chunk_index, sorted_run.value_count);
 }
 
 size_t ExternalMergeTapeSorter::max_chunk_value_count(const Tape &input_tape) const {
@@ -55,10 +73,13 @@ ExternalMergeTapeSorter::SortedRun ExternalMergeTapeSorter::create_empty_run(siz
 std::vector<int32_t> ExternalMergeTapeSorter::read_sorted_chunk(Tape &input_tape, size_t max_value_count) {
     std::vector<int32_t> chunk;
     chunk.reserve(max_value_count);
+    detail::SortProgressLogger progress("external merge sort chunk read IO",
+                                        std::min(max_value_count, input_tape.size() - input_tape.position()));
 
     while (chunk.size() < max_value_count && has_unread_values(input_tape)) {
         chunk.push_back(input_tape.read());
         input_tape.next();
+        progress.mark(chunk.size());
     }
 
     std::ranges::sort(chunk);
@@ -69,9 +90,11 @@ void ExternalMergeTapeSorter::merge_run_with_chunk(Tape &run_tape, size_t run_va
                                                    std::span<const int32_t> sorted_chunk, Tape &output_tape) {
     run_tape.rewind();
     output_tape.rewind();
+    spdlog::info("external merge sort merge started: run_size={}, chunk_size={}", run_value_count, sorted_chunk.size());
 
     size_t copied_from_run{};
     size_t copied_from_chunk{};
+    detail::SortProgressLogger progress("external merge sort merge IO", run_value_count + sorted_chunk.size());
 
     while (copied_from_run < run_value_count && copied_from_chunk < sorted_chunk.size()) {
         const int32_t run_value = run_tape.read();
@@ -87,6 +110,7 @@ void ExternalMergeTapeSorter::merge_run_with_chunk(Tape &run_tape, size_t run_va
         }
 
         output_tape.next();
+        progress.mark(copied_from_run + copied_from_chunk);
     }
 
     while (copied_from_run < run_value_count) {
@@ -94,24 +118,33 @@ void ExternalMergeTapeSorter::merge_run_with_chunk(Tape &run_tape, size_t run_va
         ++copied_from_run;
         run_tape.next();
         output_tape.next();
+        progress.mark(copied_from_run + copied_from_chunk);
     }
 
     while (copied_from_chunk < sorted_chunk.size()) {
         output_tape.write(sorted_chunk[copied_from_chunk]);
         ++copied_from_chunk;
         output_tape.next();
+        progress.mark(copied_from_run + copied_from_chunk);
     }
+
+    spdlog::info("external merge sort merge finished: copied_from_run={}, copied_from_chunk={}", copied_from_run,
+                 copied_from_chunk);
 }
 
 void ExternalMergeTapeSorter::copy_run(Tape &source_tape, size_t value_count, Tape &output_tape) {
     source_tape.rewind();
     output_tape.rewind();
+    detail::SortProgressLogger progress("external merge sort output copy IO", value_count);
 
     for (size_t copied_values = 0; copied_values < value_count; ++copied_values) {
         output_tape.write(source_tape.read());
         source_tape.next();
         output_tape.next();
+        progress.mark(copied_values + 1);
     }
+
+    spdlog::info("external merge sort output copied: value_count={}", value_count);
 }
 
 }  // namespace tp
