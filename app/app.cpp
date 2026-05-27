@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -27,13 +26,33 @@ void add_stats(tp::Tape::TapeStats &target, const tp::Tape::TapeStats &source) {
 }
 
 std::string format_duration(std::chrono::nanoseconds duration) {
-    std::ostringstream stream;
-    stream << duration.count() << " ns";
-
-    if (duration != std::chrono::nanoseconds{}) {
-        const auto milliseconds = std::chrono::duration<double, std::milli>(duration);
-        stream << " (" << std::fixed << std::setprecision(3) << milliseconds.count() << " ms)";
+    if (duration == std::chrono::nanoseconds{}) {
+        return "0ns";
     }
+
+    std::ostringstream stream;
+    bool has_previous_unit = false;
+
+    auto append_unit = [&stream, &duration, &has_previous_unit](auto unit, const char *suffix) {
+        const auto value = std::chrono::duration_cast<decltype(unit)>(duration);
+        if (value == decltype(unit){}) {
+            return;
+        }
+
+        if (has_previous_unit) {
+            stream << ' ';
+        }
+        stream << value.count() << suffix;
+        duration -= value;
+        has_previous_unit = true;
+    };
+
+    append_unit(std::chrono::hours{1}, "h");
+    append_unit(std::chrono::minutes{1}, "min");
+    append_unit(std::chrono::seconds{1}, "s");
+    append_unit(std::chrono::milliseconds{1}, "ms");
+    append_unit(std::chrono::microseconds{1}, "us");
+    append_unit(std::chrono::nanoseconds{1}, "ns");
 
     return stream.str();
 }
