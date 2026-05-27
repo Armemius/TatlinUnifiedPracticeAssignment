@@ -10,8 +10,9 @@ FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 
 
-add_executable(tape-test tape_test.cpp tape_sorter_test.cpp)
-target_link_libraries(tape-test PRIVATE tape-emulator utils GTest::gtest_main)
+add_executable(tape-test config_parser_test.cpp tape_test.cpp tape_sorter_test.cpp)
+target_link_libraries(tape-test PRIVATE config tape-emulator utils GTest::gtest_main)
 target_compile_features(tape-test PRIVATE cxx_std_20)
+target_compile_definitions(tape-test PRIVATE PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 gtest_discover_tests(tape-test)
