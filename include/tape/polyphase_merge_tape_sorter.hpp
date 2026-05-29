@@ -39,8 +39,8 @@ class PolyphaseMergeTapeSorter final : public TapeSorter {
     using WorkTapes = std::array<WorkTape, 3>;
 
     [[nodiscard]] size_t max_chunk_value_count(const Tape &input_tape) const;
-    [[nodiscard]] InitialRunDistribution initial_run_distribution(size_t input_value_count,
-                                                                  size_t max_chunk_value_count) const;
+    [[nodiscard]] static InitialRunDistribution initial_run_distribution(size_t input_value_count,
+                                                                  size_t max_chunk_value_count);
     [[nodiscard]] WorkTapes create_initial_work_tapes(Tape &input_tape, size_t max_chunk_value_count) const;
     [[nodiscard]] static size_t total_run_count(const WorkTapes &tapes);
     [[nodiscard]] static size_t real_run_count(const WorkTapes &tapes);

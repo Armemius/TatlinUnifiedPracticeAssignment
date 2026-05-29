@@ -90,7 +90,7 @@ size_t PolyphaseMergeTapeSorter::max_chunk_value_count(const Tape &input_tape) c
 }
 
 PolyphaseMergeTapeSorter::InitialRunDistribution PolyphaseMergeTapeSorter::initial_run_distribution(
-    size_t input_value_count, size_t max_chunk_value_count) const {
+    size_t input_value_count, size_t max_chunk_value_count) {
     const size_t real_run_total = run_count_for_input(input_value_count, max_chunk_value_count);
     if (real_run_total == 0) {
         return {};
@@ -162,7 +162,7 @@ size_t PolyphaseMergeTapeSorter::real_run_count(const WorkTapes &tapes) {
 }
 
 size_t PolyphaseMergeTapeSorter::empty_tape_index(const WorkTapes &tapes) {
-    const auto empty_tape = std::ranges::find_if(tapes, [](const WorkTape &tape) { return tape.runs.empty(); });
+    const auto *const empty_tape = std::ranges::find_if(tapes, [](const WorkTape &tape) { return tape.runs.empty(); });
     if (empty_tape == tapes.end()) {
         throw std::logic_error("polyphase merge sort requires one empty work tape before every pass");
     }
