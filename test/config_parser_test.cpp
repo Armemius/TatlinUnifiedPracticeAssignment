@@ -22,7 +22,7 @@ TEST(ConfigParserTests, ParsesSampleConfig) {
     Config config = parse_config(std::filesystem::path(PROJECT_SOURCE_DIR) / "assets/config.toml");
 
     ASSERT_EQ(config.tape_sorter.memory_limit_bytes, 256 * 1024 * 1024);
-    ASSERT_EQ(config.tape_sorter.algorithm, TapeSorterAlgorithm::BASIC_EXTERNAL_MERGE);
+    ASSERT_EQ(config.tape_sorter.algorithm, TapeSorterAlgorithm::POLYPHASE_MERGE);
     ASSERT_FALSE(config.tape_sorter.latency.enable_sleep_delays);
     ASSERT_EQ(config.tape_sorter.latency.read_delay, std::chrono::microseconds(1));
     ASSERT_EQ(config.tape_sorter.latency.write_delay, std::chrono::microseconds(2));
