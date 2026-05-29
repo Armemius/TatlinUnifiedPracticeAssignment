@@ -38,8 +38,9 @@ storage. Implemented algorithms include:
 - **K-way Merge Sort**: An extension of the merge sort algorithm that merges
   multiple sorted runs simultaneously, reducing the number of passes needed to
   sort the data
-- TODO ~~**Polyphase Merge Sort**: An advanced external sorting algorithm that
-  optimizes the number of runs and merges, often used in tape storage systems~~
+- **Polyphase Merge Sort**: A tape-oriented merge algorithm that distributes
+  sorted runs by Fibonacci counts and uses dummy runs to reduce idle merge
+  passes
 
 Some utility scripts were also implemented, such as:
 
@@ -60,6 +61,7 @@ memory_limit = "4mb"
 # Available
 # - basic_external_merge
 # - k_way_external_merge
+# - polyphase_merge
 algorithm = "k_way_external_merge"
 
 [tape_sorter.latency]
