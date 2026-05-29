@@ -9,6 +9,7 @@ namespace tp::config {
 enum class TapeSorterAlgorithm {
     BASIC_EXTERNAL_MERGE,
     K_WAY_EXTERNAL_MERGE,
+    POLYPHASE_MERGE,
 };
 
 struct KWayExternalMergeConfig {

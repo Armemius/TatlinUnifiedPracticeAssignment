@@ -133,6 +133,9 @@ TapeSorterAlgorithm parse_tape_sorter_algorithm(std::string_view value) {
     if (normalized == "k_way_external_merge") {
         return TapeSorterAlgorithm::K_WAY_EXTERNAL_MERGE;
     }
+    if (normalized == "polyphase_merge" || normalized == "polyphase") {
+        return TapeSorterAlgorithm::POLYPHASE_MERGE;
+    }
 
     throw std::invalid_argument("unknown tape sorter algorithm: " + std::string(value));
 }
