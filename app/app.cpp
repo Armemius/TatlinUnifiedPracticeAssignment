@@ -2,6 +2,7 @@
 #include "tape/external_k_way_merge_tape_sorter.hpp"
 #include "tape/external_merge_tape_sorter.hpp"
 #include "tape/file_tape.hpp"
+#include "tape/polyphase_merge_tape_sorter.hpp"
 #include "tape/tape_sorter.hpp"
 #include "utils/tmp_directory.hpp"
 
@@ -106,6 +107,10 @@ int main(int argc, char **argv) {
                 sorter = std::make_unique<tp::ExternalKWayMergeTapeSorter>(
                     tape_factory, config.tape_sorter.memory_limit_bytes,
                     config.tape_sorter.k_way_external_merge.merge_order);
+                break;
+            case tp::config::TapeSorterAlgorithm::POLYPHASE_MERGE:
+                sorter =
+                    std::make_unique<tp::PolyphaseMergeTapeSorter>(tape_factory, config.tape_sorter.memory_limit_bytes);
                 break;
         }
 
