@@ -3,6 +3,7 @@
 #include "tape/external_k_way_merge_tape_sorter.hpp"
 #include "tape/external_merge_tape_sorter.hpp"
 #include "tape/mem_tape.hpp"
+#include "tape/polyphase_merge_tape_sorter.hpp"
 #include "tape/tape.hpp"
 
 #include <algorithm>
@@ -115,6 +116,49 @@ TEST(ExternalKWayMergeSorterTests, RejectsMergeOrderBelowTwo) {
 TEST(ExternalKWayMergeSorterTests, RejectsMemoryLimitBelowOneElement) {
     std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
     ExternalKWayMergeTapeSorter sorter{std::move(factory), sizeof(int32_t) - 1, 3};
+
+    std::shared_ptr<Tape> input_tape = make_tape({1});
+    std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());
+
+    ASSERT_THROW(sorter.sort(input_tape, output_tape), std::invalid_argument);
+}
+
+TEST(PolyphaseMergeSorterTests, SortsCommonInputsWithMultiChunkRuns) {
+    assert_sorter_handles_common_inputs([] {
+        return std::make_unique<PolyphaseMergeTapeSorter>(std::make_shared<MemTapeFactory>(), sizeof(int32_t) * 3);
+    });
+}
+
+TEST(PolyphaseMergeSorterTests, SortsCommonInputsWithOneValueChunks) {
+    assert_sorter_handles_common_inputs(
+        [] { return std::make_unique<PolyphaseMergeTapeSorter>(std::make_shared<MemTapeFactory>(), sizeof(int32_t)); });
+}
+
+TEST(PolyphaseMergeSorterTests, SortsWhenFibonacciDistributionNeedsDummyRuns) {
+    std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
+    PolyphaseMergeTapeSorter sorter{std::move(factory), sizeof(int32_t)};
+
+    assert_sorts_values(sorter, {13, 5, 8, 3, 2, 21, 1});
+}
+
+TEST(PolyphaseMergeSorterTests, SortsManyFibonacciDistributionBoundaries) {
+    for (size_t value_count = 1; value_count <= 32; ++value_count) {
+        std::vector<int32_t> input_values;
+        input_values.reserve(value_count);
+
+        for (size_t index = 0; index < value_count; ++index) {
+            input_values.push_back(static_cast<int32_t>(((index * 17) + (value_count * 5)) % 41) - 20);
+        }
+
+        std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
+        PolyphaseMergeTapeSorter sorter{std::move(factory), sizeof(int32_t)};
+        assert_sorts_values(sorter, input_values);
+    }
+}
+
+TEST(PolyphaseMergeSorterTests, RejectsMemoryLimitBelowOneElement) {
+    std::shared_ptr<TapeFactory> factory = std::make_shared<MemTapeFactory>();
+    PolyphaseMergeTapeSorter sorter{std::move(factory), sizeof(int32_t) - 1};
 
     std::shared_ptr<Tape> input_tape = make_tape({1});
     std::shared_ptr<MemTape> output_tape = std::make_shared<MemTape>(input_tape->size());

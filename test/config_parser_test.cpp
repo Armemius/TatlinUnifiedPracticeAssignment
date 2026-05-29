@@ -55,6 +55,24 @@ merge_order = 3
     ASSERT_EQ(config.tape_sorter.k_way_external_merge.merge_order, 3);
 }
 
+TEST(ConfigParserTests, ParsesPolyphaseSorterConfig) {
+    utils::TmpDirectory directory;
+    const std::filesystem::path path = write_config(directory, R"toml(
+[tape_sorter]
+memory_limit = "4kb"
+algorithm = "polyphase_merge"
+)toml");
+
+    Config config = parse_config(path);
+
+    ASSERT_EQ(config.tape_sorter.memory_limit_bytes, 4 * 1024);
+    ASSERT_EQ(config.tape_sorter.algorithm, TapeSorterAlgorithm::POLYPHASE_MERGE);
+}
+
+TEST(ConfigParserTests, ParsesPolyphaseSorterAlias) {
+    ASSERT_EQ(parse_tape_sorter_algorithm("polyphase"), TapeSorterAlgorithm::POLYPHASE_MERGE);
+}
+
 TEST(ConfigParserTests, ParsesMemorySizeUnits) {
     ASSERT_EQ(parse_memory_size("42"), 42);
     ASSERT_EQ(parse_memory_size("2kb"), 2 * 1024);
