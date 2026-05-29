@@ -1,10 +1,11 @@
 [tape_sorter]
-memory_limit = "256mb"
+memory_limit = "256MB"
 
 # Available
 # - basic_external_merge
 # - k_way_external_merge
-algorithm = "basic_external_merge"
+# - polyphase_merge
+algorithm = "polyphase_merge"
 
 [tape_sorter.latency]
 emulate_delays = false
