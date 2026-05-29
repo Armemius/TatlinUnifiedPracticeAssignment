@@ -162,11 +162,13 @@ size_t PolyphaseMergeTapeSorter::real_run_count(const WorkTapes &tapes) {
 }
 
 size_t PolyphaseMergeTapeSorter::empty_tape_index(const WorkTapes &tapes) {
-    const auto *const empty_tape = std::ranges::find_if(tapes, [](const WorkTape &tape) { return tape.runs.empty(); });
-    if (empty_tape == tapes.end()) {
-        throw std::logic_error("polyphase merge sort requires one empty work tape before every pass");
+    for (size_t tape_index = 0; tape_index < tapes.size(); ++tape_index) {
+        if (tapes[tape_index].runs.empty()) {
+            return tape_index;
+        }
     }
-    return static_cast<size_t>(std::distance(tapes.begin(), empty_tape));
+
+    throw std::logic_error("polyphase merge sort requires one empty work tape before every pass");
 }
 
 size_t PolyphaseMergeTapeSorter::phase_output_value_count(const WorkTape &left, const WorkTape &right,
